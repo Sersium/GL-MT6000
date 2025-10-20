@@ -1,0 +1,43 @@
+#!/bin/sh
+
+uci -q batch <<'EOI'
+set network.wan.proto='pppoe'
+set network.wan.username='CHANGE_ME_PPPoE_USERNAME'
+set network.wan.password='CHANGE_ME_PPPoE_PASSWORD'
+set network.wan.mtu='1492'
+set network.wan.ipv6='auto'
+set network.wan.keepalive='6 10'
+set network.wan.demand='0'
+set network.globals=globals
+set network.globals.packet_steering='1'
+set network.wan6=interface
+set network.wan6.proto='dhcpv6'
+set network.wan6.ifname='@wan'
+set network.wan6.reqaddress='try'
+set network.wan6.reqprefix='auto'
+EOI
+uci commit network
+
+uci -q batch <<'EOI'
+set firewall.wan_ssh=rule
+set firewall.wan_ssh.name='Allow-SSH-From-WAN'
+set firewall.wan_ssh.src='wan'
+set firewall.wan_ssh.proto='tcp'
+set firewall.wan_ssh.dest_port='22'
+set firewall.wan_ssh.target='ACCEPT'
+set firewall.wan_ssh.enabled='1'
+set firewall.wan_ssh.family='any'
+EOI
+uci commit firewall
+
+uci -q batch <<'EOI'
+set dhcp.lan.dhcpv6='server'
+set dhcp.lan.ra='server'
+set dhcp.lan.ra_default='1'
+set dhcp.lan.ra_slaac='1'
+set dhcp.lan.ra_management='1'
+set dhcp.lan.ndp='hybrid'
+EOI
+uci commit dhcp
+
+exit 0
