@@ -77,7 +77,7 @@ The build now ships `ddns-scripts`, the Cloudflare back end, LuCI integration, a
 
 1. In Cloudflare, create an **API token** limited to the zone that holds your homelab hostname with permissions `Zone.Zone → Read` and `Zone.DNS → Edit`. Copy the Zone ID from the Cloudflare dashboard.
 2. SSH into the router and edit `/etc/config/ddns` (or use **Services → Dynamic DNS** in LuCI) to replace:
-   - `home@example.com` with `host@example.com` for the record you publish through Cloudflare.
+   - `home.example.com` with `host.example.com` for the record you publish through Cloudflare.
    - `REPLACE_WITH_CLOUDFLARE_API_TOKEN` with the API token you created.
    - `REPLACE_WITH_ZONE_ID` with the Zone ID from Cloudflare.
 3. Leave `username` set to `Bearer`. This tells the helper scripts to authenticate using your API token instead of the legacy global key.
