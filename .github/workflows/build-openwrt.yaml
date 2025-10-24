@@ -106,7 +106,7 @@ jobs:
         run: |
           RELEASE_DATE=$(date +%F)
           gh release delete "${{ needs.check_commits.outputs.release_prefix }}-${RELEASE_DATE}" --cleanup-tag -y --repo "${{ github.repository }}" ||:
-          gh release create "${{ needs.check_commits.outputs.release_prefix }}-${RELEASE_DATE}" --repo "${{ github.repository }}" --latest --notes "### 🔄 Dev Build
+          gh release create "${{ needs.check_commits.outputs.release_prefix }}-${RELEASE_DATE}" --repo "${{ github.repository }}" --prerelease --notes "### 🔄 Dev Build
           - **Repository:** [${{ env.REMOTE_REPOSITORY }}](https://github.com/${{ env.REMOTE_REPOSITORY }})
           - **Branch:** ${{ needs.check_commits.outputs.remote_branch }}
           - **Commit:** ${{ needs.check_commits.outputs.latest_commit_sha }}
