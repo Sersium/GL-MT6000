@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - main
+      - dev
   schedule:
     - cron: "38 1 * * *"
 
@@ -106,7 +106,7 @@ jobs:
         run: |
           RELEASE_DATE=$(date +%F)
           gh release delete "${{ needs.check_commits.outputs.release_prefix }}-${RELEASE_DATE}" --cleanup-tag -y --repo "${{ github.repository }}" ||:
-          gh release create "${{ needs.check_commits.outputs.release_prefix }}-${RELEASE_DATE}" --repo "${{ github.repository }}" --latest --notes "### 🔄 Main Repository
+          gh release create "${{ needs.check_commits.outputs.release_prefix }}-${RELEASE_DATE}" --repo "${{ github.repository }}" --latest --notes "### 🔄 Dev Build
           - **Repository:** [${{ env.REMOTE_REPOSITORY }}](https://github.com/${{ env.REMOTE_REPOSITORY }})
           - **Branch:** ${{ needs.check_commits.outputs.remote_branch }}
           - **Commit:** ${{ needs.check_commits.outputs.latest_commit_sha }}
@@ -118,7 +118,7 @@ jobs:
           - **Wireguard VPN**
           - **Policy Based Routing**
           - **Ad Block Fast**
-          - **REMOVED:** odhcp, upnp, iptables, avahi, samba, usb storage..." --title "OpenWrt Custom Release for Flint 2 (${{ needs.check_commits.outputs.release_prefix }}-${RELEASE_DATE})" firmware/*
+          - **REMOVED:** odhcp, upnp, iptables, avahi, samba, usb storage..." --title "OpenWrt Dev Build for Flint 2 (${{ needs.check_commits.outputs.release_prefix }}-${RELEASE_DATE})" firmware/*
 
       - name: Clean up old releases
         run: |
