@@ -1,0 +1,41 @@
+#!/bin/sh
+
+uci -q delete ddns.cloudflare_v4
+uci -q delete ddns.cloudflare_v6
+
+uci -q batch <<'EOI'
+set ddns.cloudflare_v4=service
+set ddns.cloudflare_v4.enabled='0'
+set ddns.cloudflare_v4.lookup_host='CHANGE_ME.example.com'
+set ddns.cloudflare_v4.domain='CHANGE_ME.example.com'
+set ddns.cloudflare_v4.service_name='cloudflare.com-v4'
+set ddns.cloudflare_v4.username='token'
+set ddns.cloudflare_v4.password='CHANGE_ME_CLOUDFLARE_API_TOKEN'
+set ddns.cloudflare_v4.interface='wan'
+set ddns.cloudflare_v4.ip_source='network'
+set ddns.cloudflare_v4.ip_network='wan'
+set ddns.cloudflare_v4.force_interval='10'
+set ddns.cloudflare_v4.force_unit='minutes'
+set ddns.cloudflare_v4.retry_interval='1'
+set ddns.cloudflare_v4.retry_unit='minutes'
+set ddns.cloudflare_v4.use_https='1'
+
+set ddns.cloudflare_v6=service
+set ddns.cloudflare_v6.enabled='0'
+set ddns.cloudflare_v6.lookup_host='CHANGE_ME.example.com'
+set ddns.cloudflare_v6.domain='CHANGE_ME.example.com'
+set ddns.cloudflare_v6.service_name='cloudflare.com-v6'
+set ddns.cloudflare_v6.username='token'
+set ddns.cloudflare_v6.password='CHANGE_ME_CLOUDFLARE_API_TOKEN'
+set ddns.cloudflare_v6.interface='wan6'
+set ddns.cloudflare_v6.ip_source='network'
+set ddns.cloudflare_v6.ip_network='wan6'
+set ddns.cloudflare_v6.force_interval='10'
+set ddns.cloudflare_v6.force_unit='minutes'
+set ddns.cloudflare_v6.retry_interval='1'
+set ddns.cloudflare_v6.retry_unit='minutes'
+set ddns.cloudflare_v6.use_https='1'
+EOI
+uci commit ddns
+
+exit 0

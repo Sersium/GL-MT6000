@@ -1,0 +1,14 @@
+#!/bin/sh
+# Simple helper to send a Wake-on-LAN magic packet to the homelab server.
+# Edit the TARGET_MAC and TARGET_INTERFACE variables to match your setup
+# before using the script.
+
+TARGET_MAC="00:11:22:33:44:55"
+TARGET_INTERFACE="br-lan"
+
+if [ "${TARGET_MAC}" = "00:11:22:33:44:55" ]; then
+    echo "Please edit /usr/bin/wake_homelab and set TARGET_MAC to your server's MAC address." >&2
+    exit 1
+fi
+
+exec /usr/bin/etherwake -i "${TARGET_INTERFACE}" "${TARGET_MAC}"
