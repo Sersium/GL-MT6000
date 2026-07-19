@@ -9,7 +9,7 @@ Read [this topic](https://forum.openwrt.org/t/mt6000-custom-build-with-luci-and-
 
 Compared to his custom firmware, this firmware adds:
 - **WiFi UCODE scripts** (faster boot)
-- **Wireguard VPN**
+- **Wireguard VPN server**, auto-provisioned on first boot by [`98_wireguard_server`](files/etc/uci-defaults/98_wireguard_server): interface `wg0` (10.100.0.1/24) listening on UDP 51820, WAN firewall rule included, private key generated on-device. Add peers in LuCI (Network → Interfaces → wg0 → Peers) — `qrencode` is included so client configs can be exported as QR codes. Existing configuration is never overwritten.
 - **Policy Based Routing** (select what goes through VPN and what not)
 - **AdBlock Fast** (ads and malware blocking at DNS level)
 - **Custom Attended Sysupgrade** (install custom firmware from GitHub)

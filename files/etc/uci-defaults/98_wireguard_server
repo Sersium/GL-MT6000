@@ -1,0 +1,39 @@
+# Provision a WireGuard VPN server on first boot, unless a working one is
+# already configured (settings kept across sysupgrades must not be lost).
+# The private key is generated on-device and never leaves the router.
+[ -n "$(uci -q get network.wg0.private_key)" ] && exit 0
+
+WG_KEY="$(wg genkey)"
+
+uci -q delete network.wg0
+uci -q batch << EOI
+
+set network.wg0=interface
+set network.wg0.proto='wireguard'
+set network.wg0.private_key='${WG_KEY}'
+set network.wg0.listen_port='51820'
+# 1412 = PPPoE WAN MTU (1492) minus WireGuard overhead (80)
+set network.wg0.mtu='1412'
+add_list network.wg0.addresses='10.100.0.1/24'
+
+commit network
+EOI
+
+if ! uci -q show firewall | grep -q "Allow-WireGuard"; then
+  uci -q batch << EOI
+
+add firewall rule
+set firewall.@rule[-1].name='Allow-WireGuard'
+set firewall.@rule[-1].src='wan'
+set firewall.@rule[-1].proto='udp'
+set firewall.@rule[-1].dest_port='51820'
+set firewall.@rule[-1].target='ACCEPT'
+
+commit firewall
+EOI
+fi
+
+if ! uci -q get firewall.@zone[0].network | grep -q wg0; then
+  uci add_list firewall.@zone[0].network='wg0'
+  uci commit firewall
+fi
