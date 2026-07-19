@@ -42,15 +42,18 @@ jobs:
           echo "release_prefix=${remote_branch%.rss*}" >> $GITHUB_OUTPUT
           echo "latest_commit_sha=$latest_commit_sha" >> $GITHUB_OUTPUT
 
-      - name: Select build runner (self-hosted when online, hosted otherwise)
+      - name: Select build runner (self-hosted only for manual runs)
         id: select_runner
         run: |
           runner='"ubuntu-24.04-arm"'
-          status=$(curl -sf -H "Authorization: Bearer ${{ secrets.RUNNER_PAT }}" \
-            "https://api.github.com/repos/${{ github.repository }}/actions/runners" \
-            | jq -r '[.runners[] | select([.labels[].name] | index("openwrt-builder")) | .status] | first // empty' || true)
-          [ "$status" = "online" ] && runner='["self-hosted","openwrt-builder"]'
-          echo "Selected runner: $runner (openwrt-builder status: ${status:-unknown})"
+          status='not-checked'
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            status=$(curl -sf -H "Authorization: Bearer ${{ secrets.RUNNER_PAT }}" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/runners" \
+              | jq -r '[.runners[] | select([.labels[].name] | index("openwrt-builder")) | .status] | first // empty' || true)
+            [ "$status" = "online" ] && runner='["self-hosted","openwrt-builder"]'
+          fi
+          echo "Event: ${{ github.event_name }}; selected runner: $runner (openwrt-builder status: ${status:-unknown})"
           echo "build_runner=$runner" >> $GITHUB_OUTPUT
 
   build:
