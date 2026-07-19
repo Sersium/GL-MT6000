@@ -11,6 +11,7 @@ Compared to his custom firmware, this firmware adds:
 - **WiFi UCODE scripts** (faster boot)
 - **Wireguard VPN server**, auto-provisioned on first boot by [`98_wireguard_server`](files/etc/uci-defaults/98_wireguard_server): interface `wg0` (10.100.0.1/24) listening on UDP 51820, WAN firewall rule included, private key generated on-device. Add peers in LuCI (Network → Interfaces → wg0 → Peers) — `qrencode` is included so client configs can be exported as QR codes. Existing configuration is never overwritten.
 - **Policy Based Routing** (select what goes through VPN and what not)
+- **Measured SQM profile for this 1 Gbps PPPoE link**: CAKE `diffserv4` at 945 Mbps on upload, with per-host fairness, ACK filtering, correct PPPoE/VLAN overhead, and wired LAN ports promoted over WiFi during contention. Download remains unshaped because this MT7986 build measured 934 Mbps with under 1 ms additional loaded latency natively, while IFB ingress shaping reduced throughput to roughly 740 Mbps.
 - **AdBlock Fast** (ads and malware blocking at DNS level)
 - **Custom Attended Sysupgrade** (install custom firmware from GitHub)
 

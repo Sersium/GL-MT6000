@@ -1,0 +1,25 @@
+#!/bin/sh /etc/rc.common
+
+START=19
+STOP=89
+
+start() {
+	nft delete table bridge wired_priority 2>/dev/null
+	nft -f - <<'EOF'
+table bridge wired_priority {
+	chain prerouting {
+		type filter hook prerouting priority -300; policy accept;
+		iifname { "lan1", "lan2", "lan3", "lan4", "lan5" } ether type ip ip dscp set cs4 counter
+		iifname { "lan1", "lan2", "lan3", "lan4", "lan5" } ether type ip6 ip6 dscp set cs4 counter
+	}
+}
+EOF
+}
+
+stop() {
+	nft delete table bridge wired_priority 2>/dev/null
+}
+
+reload() {
+	start
+}

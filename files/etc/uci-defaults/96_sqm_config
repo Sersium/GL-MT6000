@@ -1,0 +1,27 @@
+#!/bin/sh
+
+# The PPPoE downstream was measured at 934 Mbps with less than 1 ms of
+# additional loaded latency.  Shaping it through IFB limits the MT7986 to
+# roughly 740 Mbps, so leave ingress unshaped.  Shape upload with CAKE where
+# the ISP queue showed measurable latency growth.
+uci -q batch <<'EOF'
+set sqm.wan=queue
+set sqm.wan.interface='pppoe-wan'
+set sqm.wan.enabled='1'
+set sqm.wan.download='0'
+set sqm.wan.upload='945000'
+set sqm.wan.qdisc='cake'
+set sqm.wan.script='layer_cake.qos'
+set sqm.wan.linklayer='ethernet'
+set sqm.wan.overhead='34'
+set sqm.wan.eqdisc_opts='diffserv4 nat dual-srchost mpu 64 ack-filter no-split-gso wash'
+set sqm.wan.iqdisc_opts='nat dual-dsthost ingress mpu 64 no-split-gso wash'
+set sqm.wan.debug_logging='0'
+set sqm.wan.verbosity='5'
+commit sqm
+EOF
+
+/etc/init.d/sqm enable
+/etc/init.d/sqm restart
+
+exit 0
