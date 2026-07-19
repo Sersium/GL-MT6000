@@ -2,9 +2,12 @@ uci -q batch << EOI
 
 # Wireless radio0 specific settings
 # No txpower option: the driver then uses the regulatory/hardware maximum.
+# Channel 6 chosen from a 2026-07 site scan: ch11 had 18 neighboring BSSs
+# and ch1 had 6 (both with strong ones); 6 was nearly empty. HE20 kept for
+# maximum range (concentrated power, narrow noise bandwidth).
 set wireless.radio0.country='CA'
 set wireless.radio0.band='2g'
-set wireless.radio0.channel='11'
+set wireless.radio0.channel='6'
 set wireless.radio0.htmode='HE20'
 set wireless.radio0.cell_density='0'
 set wireless.radio0.vendor_vht='1'
@@ -17,12 +20,14 @@ set wireless.default_radio0.ieee80211n='1'
 set wireless.default_radio0.ocv='0'
 
 # Wireless radio1 specific settings
-# Channel 149 (U-NII-3): no DFS radar detection and the highest-power 5GHz
-# block in the CA regdomain (32 dBm on this hardware); HE80 spans 149-161.
+# Channel 36/HE80 (36-48 block): non-DFS and nearly silent in a 2026-07
+# site scan (nothing above -95 dBm), while the higher-power 149-161 block
+# had co-channel neighbors at -80 dBm costing airtime. 23 dBm indoor limit
+# is ample for the short-range basement cell this radio serves.
 # No txpower option: the driver then uses the regulatory/hardware maximum.
 set wireless.radio1.country='CA'
 set wireless.radio1.band='5g'
-set wireless.radio1.channel='149'
+set wireless.radio1.channel='36'
 set wireless.radio1.htmode='HE80'
 set wireless.radio1.cell_density='1'
 

@@ -26,6 +26,7 @@ jobs:
       release_prefix: ${{ steps.check_commits.outputs.release_prefix }}
       new_commits: ${{ steps.check_commits.outputs.new_commits }}
       latest_commit_sha: ${{ steps.check_commits.outputs.latest_commit_sha }}
+      build_runner: ${{ steps.select_runner.outputs.build_runner }}
     steps:
       - name: Check for new commits in pesa1234 repo
         id: check_commits
@@ -41,17 +42,32 @@ jobs:
           echo "release_prefix=${remote_branch%.rss*}" >> $GITHUB_OUTPUT
           echo "latest_commit_sha=$latest_commit_sha" >> $GITHUB_OUTPUT
 
+      - name: Select build runner (self-hosted when online, hosted otherwise)
+        id: select_runner
+        run: |
+          runner='"ubuntu-24.04-arm"'
+          status=$(curl -sf -H "Authorization: Bearer ${{ secrets.RUNNER_PAT }}" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/runners" \
+            | jq -r '[.runners[] | select([.labels[].name] | index("openwrt-builder")) | .status] | first // empty' || true)
+          [ "$status" = "online" ] && runner='["self-hosted","openwrt-builder"]'
+          echo "Selected runner: $runner (openwrt-builder status: ${status:-unknown})"
+          echo "build_runner=$runner" >> $GITHUB_OUTPUT
+
   build:
     name: Build OpenWrt
     needs: check_commits
     if: github.event_name == 'workflow_dispatch' || needs.check_commits.outputs.new_commits == 'true'
-    runs-on: ubuntu-24.04-arm
+    runs-on: ${{ fromJSON(needs.check_commits.outputs.build_runner) }}
     steps:
       - name: Install dependencies
         run: |
-          sudo apt update
-          sudo apt install -y build-essential clang flex bison g++ gawk gettext libncurses-dev libssl-dev python3-setuptools rsync swig unzip zlib1g-dev file wget llvm
-          sudo apt autoremove -y && sudo apt clean -y
+          if command -v apt >/dev/null 2>&1; then
+            sudo apt update
+            sudo apt install -y build-essential clang flex bison g++ gawk gettext libncurses-dev libssl-dev python3-setuptools rsync swig unzip zlib1g-dev file wget llvm
+            sudo apt autoremove -y && sudo apt clean -y
+          else
+            echo "Self-hosted non-apt host, dependencies are preinstalled"
+          fi
 
       - name: Checkout remote repository
         uses: actions/checkout@v6.0.2
@@ -65,6 +81,7 @@ jobs:
           path: "builder_repo"
 
       - name: Restore build caches (ccache and downloads)
+        if: runner.environment == 'github-hosted'
         uses: actions/cache@v4
         with:
           path: |
@@ -74,6 +91,13 @@ jobs:
           restore-keys: |
             build-cache-${{ needs.check_commits.outputs.remote_branch }}-
             build-cache-
+
+      - name: Use persistent local caches (self-hosted)
+        if: runner.environment == 'self-hosted'
+        run: |
+          mkdir -p "$HOME/.cache/openwrt/ccache" "$HOME/.cache/openwrt/dl"
+          printf 'CONFIG_CCACHE_DIR="%s"\n' "$HOME/.cache/openwrt/ccache" >> builder_repo/${{ env.CONFIG_FILE }}
+          printf 'CONFIG_DOWNLOAD_FOLDER="%s"\n' "$HOME/.cache/openwrt/dl" >> builder_repo/${{ env.CONFIG_FILE }}
 
       - name: Update and install feeds
         run: |
