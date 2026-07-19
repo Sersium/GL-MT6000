@@ -64,6 +64,17 @@ jobs:
         with:
           path: "builder_repo"
 
+      - name: Restore build caches (ccache and downloads)
+        uses: actions/cache@v4
+        with:
+          path: |
+            .ccache
+            dl
+          key: build-cache-${{ needs.check_commits.outputs.remote_branch }}-${{ github.run_id }}
+          restore-keys: |
+            build-cache-${{ needs.check_commits.outputs.remote_branch }}-
+            build-cache-
+
       - name: Update and install feeds
         run: |
           ./scripts/feeds update -a
@@ -99,6 +110,9 @@ jobs:
           find ./bin -type f \( -iname 'openwrt-*-sysupgrade.bin' -or -iname 'config.buildinfo' -or -iname 'version.buildinfo' \) -exec mv -v {} ./firmware/ \; ||:
           mv .config firmware/full.config ||:
           cd firmware && sha256sum openwrt-*-sysupgrade.bin >sha256sums ||:
+
+      - name: Show ccache statistics
+        run: staging_dir/host/bin/ccache -s || true
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7.0.0
