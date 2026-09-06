@@ -1,3 +1,7 @@
+# Only touch a factory-fresh router.
+[ "$(uci -q get qol_config.state.applied)" = "1" ] && exit 0
+touch /etc/config/qol_config
+
 uci -q batch << EOI
 
 # Wireless radio0 specific settings
@@ -44,7 +48,12 @@ set firewall.@zone[1].forward='DROP'
 # uHTTPd settings
 set uhttpd.main.redirect_https='1'
 
+# Mark these defaults as applied
+set qol_config.state='state'
+set qol_config.state.applied='1'
+
 commit wireless
 commit firewall
 commit uhttpd
+commit qol_config
 EOI
