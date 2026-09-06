@@ -1,0 +1,17 @@
+name: Check router plugin
+on:
+  push:
+    paths: ['plugins/flint-router/**', '.github/workflows/check-router-plugin.yml']
+  pull_request:
+    paths: ['plugins/flint-router/**', '.github/workflows/check-router-plugin.yml']
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - run: |
+          python3 -m venv /tmp/flint-check
+          /tmp/flint-check/bin/pip install mcp==1.29.1
+          /tmp/flint-check/bin/python plugins/flint-router/scripts/check.py

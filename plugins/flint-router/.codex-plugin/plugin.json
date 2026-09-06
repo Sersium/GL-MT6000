@@ -1,0 +1,27 @@
+{
+  "name": "flint-router",
+  "version": "0.1.0",
+  "description": "Full root access to a home Flint 2 OpenWrt router over key-authenticated SSH.",
+  "author": {
+    "name": "Sersium"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Flint Router",
+    "shortDescription": "Manage your home OpenWrt router.",
+    "longDescription": "Read router status and run root commands through a local MCP bridge using the existing SSH server. Includes a router administration skill.",
+    "developerName": "Sersium",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Check my home router status.",
+      "Diagnose my home internet connection.",
+      "Inspect my router Wi-Fi settings."
+    ]
+  },
+  "mcpServers": "./.mcp.json",
+  "repository": "https://github.com/Sersium/GL-MT6000"
+}
