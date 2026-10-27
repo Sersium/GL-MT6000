@@ -14,6 +14,7 @@ Compared to his custom firmware, this firmware adds:
 - **Measured SQM profile for this 1 Gbps PPPoE link**: CAKE `diffserv4` at 945 Mbps on upload, with per-host fairness, ACK filtering, correct PPPoE/VLAN overhead, and wired LAN ports promoted over WiFi during contention. Download remains unshaped because this MT7986 build measured 934 Mbps with under 1 ms additional loaded latency natively, while IFB ingress shaping reduced throughput to roughly 740 Mbps.
 - **AdBlock Fast** (ads and malware blocking at DNS level)
 - **Custom Attended Sysupgrade** (install custom firmware from GitHub)
+- **NordVPN Lite installer** (optional: nothing is downloaded until you run it)
 
 And also:
 - **REMOVED:** odhcp, upnp, iptables, avahi, samba, usb storage and probably more stuff I forgot to mention.
@@ -46,6 +47,22 @@ Using Luci's menu "System" --> "Attended Sysupgrade" it is now possible to selec
   
 Notes:
 - if you fork this repository, this will be adapted to look for upgrades in your repository by default.
+
+
+
+## About NordVPN Lite
+
+The firmware does not include NordVPN Lite itself, only the packages it needs and an installer. Nothing is downloaded until you run, from a SSH terminal:
+- `nordvpnlite-install --install` to install the latest release and enable a daily update check (at 04:38).
+- `nordvpnlite-install --check` to compare the installed and latest versions.
+- `nordvpnlite-install --uninstall` to remove it (the configuration and login are kept).
+
+After installing, log in with `nordvpnlite login <token>` or in Luci's menu "Services" --> "NordVPN Lite", then start it with `/etc/init.d/nordvpnlite start`. When an update is installed, a running NordVPN Lite is restarted.
+
+Notes:
+- The binary comes from the releases of [cjom/libtelio](https://github.com/cjom/libtelio/releases), a fork of NordSecurity's libtelio that adds a tunnel health check and an option to leave dnsmasq untouched. To use another fork, change `REPOSITORY` in [`nordvpnlite-install`](files/usr/sbin/nordvpnlite-install).
+- The installed files survive firmware upgrades.
+- The text output of the installer will show both in terminal and system logs.
 
 
 

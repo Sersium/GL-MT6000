@@ -1,0 +1,190 @@
+#!/bin/sh
+# nordvpnlite-install: install NordVPN Lite from the GitHub releases of a libtelio
+# fork and keep it updated. The firmware ships this installer instead of the binary,
+# so nothing is downloaded until someone runs --install, which also enables the daily
+# --update. Existing configuration and the login token are never overwritten.
+
+# Keep the pipeline's exit status (the script body is piped into logger below).
+set -o pipefail 2>/dev/null
+
+# libtelio fork whose releases are installed. NORDVPNLITE_REPOSITORY overrides it,
+# e.g. to test another fork.
+REPOSITORY="${NORDVPNLITE_REPOSITORY:-cjom/libtelio}"
+RELEASE_URL="https://github.com/${REPOSITORY}/releases/latest/download"
+BIN=/usr/sbin/nordvpnlite
+INIT=/etc/init.d/nordvpnlite
+CONF_DIR=/etc/nordvpnlite
+MARKER="$CONF_DIR/.installed_sha256sums"
+CRONTAB=/etc/crontabs/root
+CRON_CMD='/usr/sbin/nordvpnlite-install --update'
+LUCI_FILES='/usr/share/rpcd/ucode/nordvpnlite.uc
+/usr/share/rpcd/acl.d/luci-app-nordvpnlite.json
+/usr/share/luci/menu.d/luci-app-nordvpnlite.json
+/www/luci-static/resources/view/nordvpnlite/settings.js'
+
+fail() {
+  echo "*** ERROR: $* ***"
+  exit 1
+}
+
+# Tag of the latest release, read from GitHub's redirect: no API call, no rate limit.
+latest_tag() {
+  tag_url=$(curl -fsSI -o /dev/null -w '%{redirect_url}' --max-time 30 \
+    "https://github.com/${REPOSITORY}/releases/latest") || return 1
+  [ -n "$tag_url" ] && echo "${tag_url##*/}"
+}
+
+latest_sums() {
+  curl -fsSL --retry 3 --max-time 30 "$RELEASE_URL/sha256sums" \
+    || fail "could not download sha256sums from $RELEASE_URL"
+}
+
+installed_version() {
+  [ -x "$BIN" ] && "$BIN" --version 2>/dev/null | head -n 1
+}
+
+reload_luci() {
+  /etc/init.d/rpcd reload
+  rm -rf /tmp/luci-indexcache* /tmp/luci-modulecache
+}
+
+# Copy under a temporary name first, so a running daemon or rpcd never sees a
+# partially written file.
+put() { # source destination mode
+  mkdir -p "$(dirname "$2")" && cp "$1" "$2.new" && chmod "$3" "$2.new" && mv -f "$2.new" "$2" \
+    || fail "could not install $2"
+}
+
+install_release() {
+  sums=$(latest_sums) || exit 1
+  if [ -x "$BIN" ] && [ -f "$MARKER" ] && [ "$sums" = "$(cat "$MARKER")" ]; then
+    echo "*** NORDVPNLITE IS UP TO DATE ($(installed_version)) ***"
+    return 0
+  fi
+
+  tmp=$(mktemp -d /tmp/nordvpnlite-install.XXXXXX) || fail "could not create a temporary directory"
+  trap 'rm -rf "$tmp"' EXIT
+  cd "$tmp" || fail "could not enter $tmp"
+  printf '%s\n' "$sums" > sha256sums
+
+  echo "*** DOWNLOADING $(latest_tag || echo 'LATEST RELEASE') FROM ${REPOSITORY} ***"
+  for asset in nordvpnlite openwrt-feed.tar.gz; do
+    curl -fsSL --retry 3 --max-time 300 -o "$asset" "$RELEASE_URL/$asset" \
+      || fail "could not download $asset"
+  done
+  sha256sum -cs sha256sums || fail "checksum mismatch, nothing was installed"
+
+  tar -xzf openwrt-feed.tar.gz || fail "could not extract openwrt-feed.tar.gz"
+  src=feed/net/nordvpnlite/files
+  for f in nordvpnlite.init nordvpnlite.conf config.json luci/ucode/nordvpnlite.uc \
+           luci/acl.d/luci-app-nordvpnlite.json luci/menu.d/luci-app-nordvpnlite.json \
+           luci/view/nordvpnlite/settings.js; do
+    [ -f "$src/$f" ] || fail "release feed is missing $f, nothing was installed"
+  done
+
+  chmod 755 nordvpnlite
+  new_version=$(./nordvpnlite --version 2>/dev/null | head -n 1)
+  [ -n "$new_version" ] || fail "downloaded binary does not run on this router, nothing was installed"
+
+  was_running=0
+  [ -x "$INIT" ] && "$INIT" running && was_running=1
+
+  # Same files as the libtelio feed Makefile installs.
+  put nordvpnlite "$BIN" 755
+  put "$src/nordvpnlite.init" "$INIT" 755
+  put "$src/luci/ucode/nordvpnlite.uc" /usr/share/rpcd/ucode/nordvpnlite.uc 644
+  put "$src/luci/acl.d/luci-app-nordvpnlite.json" /usr/share/rpcd/acl.d/luci-app-nordvpnlite.json 644
+  put "$src/luci/menu.d/luci-app-nordvpnlite.json" /usr/share/luci/menu.d/luci-app-nordvpnlite.json 644
+  put "$src/luci/view/nordvpnlite/settings.js" /www/luci-static/resources/view/nordvpnlite/settings.js 644
+
+  # Templates only: an existing configuration or login is never overwritten.
+  [ -e /etc/config/nordvpnlite ] || put "$src/nordvpnlite.conf" /etc/config/nordvpnlite 644
+  if [ ! -d "$CONF_DIR" ]; then
+    mkdir -p "$CONF_DIR" && chmod 700 "$CONF_DIR"
+  fi
+  [ -e "$CONF_DIR/config.json" ] || put "$src/config.json" "$CONF_DIR/config.json" 640
+  printf '%s\n' "$sums" > "$MARKER"
+
+  # Same as the feed Makefile's postinst.
+  "$INIT" enable
+  reload_luci
+  echo "*** INSTALLED $new_version ***"
+
+  if [ "$was_running" = 1 ]; then
+    echo "*** RESTARTING NORDVPNLITE ***"
+    "$INIT" restart
+  else
+    echo "*** NEXT: LOG IN (LUCI: SERVICES > NORDVPN LITE, OR: nordvpnlite login <token>), THEN RUN: $INIT start ***"
+  fi
+}
+
+enable_updates() {
+  grep -qsF "$CRON_CMD" "$CRONTAB" && return 0
+  mkdir -p "$(dirname "$CRONTAB")"
+  # Terminate an unterminated last line so the new entry does not merge into it.
+  if [ -s "$CRONTAB" ] && [ -n "$(tail -c 1 "$CRONTAB")" ]; then
+    echo >> "$CRONTAB"
+  fi
+  echo "38 4 * * * $CRON_CMD" >> "$CRONTAB"
+  /etc/init.d/cron restart
+  echo "*** DAILY UPDATE CHECK ENABLED (04:38) ***"
+}
+
+check() {
+  tag=$(latest_tag) || tag=unknown
+  sums=$(latest_sums) || exit 1
+  if [ ! -f "$MARKER" ]; then
+    echo "*** NOT INSTALLED BY nordvpnlite-install (BINARY: $(installed_version || echo none)); LATEST RELEASE: $tag ***"
+  elif [ -x "$BIN" ] && [ "$sums" = "$(cat "$MARKER")" ]; then
+    echo "*** UP TO DATE: $(installed_version) ($tag) ***"
+  else
+    echo "*** UPDATE AVAILABLE: $tag (INSTALLED: $(installed_version || echo none)) ***"
+  fi
+}
+
+uninstall() {
+  if [ -x "$INIT" ]; then
+    "$INIT" stop
+    "$INIT" disable
+  fi
+  rm -f "$BIN" "$INIT" "$MARKER"
+  for f in $LUCI_FILES; do rm -f "$f"; done
+  rmdir /www/luci-static/resources/view/nordvpnlite 2>/dev/null
+  if grep -qsF "$CRON_CMD" "$CRONTAB"; then
+    sed -i "\\#$CRON_CMD#d" "$CRONTAB"
+    /etc/init.d/cron restart
+  fi
+  reload_luci
+  echo "*** NORDVPNLITE REMOVED (KEPT $CONF_DIR AND /etc/config/nordvpnlite) ***"
+}
+
+main() {
+  case "$REPOSITORY" in
+    */*) ;;
+    *) fail "release repository is not configured (got '$REPOSITORY')" ;;
+  esac
+
+  exec 9> /var/run/nordvpnlite-install.lock
+  flock -n 9 || fail "another nordvpnlite-install is already running"
+
+  case "$1" in
+    --install) install_release && enable_updates ;;
+    --update)
+      if [ -f "$MARKER" ]; then
+        install_release
+      else
+        echo "*** NORDVPNLITE WAS NOT INSTALLED WITH nordvpnlite-install, NOTHING TO UPDATE ***"
+      fi ;;
+    --check) check ;;
+    --uninstall) uninstall ;;
+    *)
+      printf '%s\n' \
+        "Usage: nordvpnlite-install --install    install or update now, and enable daily updates" \
+        "       nordvpnlite-install --update     update if installed (run daily by cron)" \
+        "       nordvpnlite-install --check      show the installed and latest versions" \
+        "       nordvpnlite-install --uninstall  remove it (keeps configuration and login)"
+      [ -z "$1" ] || exit 1 ;;
+  esac
+}
+
+main "$@" 2>&1 | tee /dev/stderr | logger -t "nordvpnlite-install[$$]"

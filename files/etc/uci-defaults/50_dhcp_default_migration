@@ -1,0 +1,24 @@
+# dnsmasq.init used to treat an unset 'dhcpv4'/'dhcpv6' option in a 'config dhcp' section as enabled.
+# OpenWrt 6f30f08d0e made unset mean disabled and the upstream migration was reverted, so a config kept
+# across a sysupgrade from older firmware silently stops serving DHCP. Pin the old behaviour once;
+# sections added afterwards follow the new default.
+[ "$(uci -q get qol_config.state.dhcp_default_migrated)" = "1" ] && exit 0
+
+# odhcpd reads the same options and always treated unset as disabled, so pinning them there could
+# start a second DHCP server. This firmware ships dnsmasq only; leave odhcpd setups untouched.
+if [ ! -x /etc/init.d/odhcpd ]; then
+	for section in $(uci -q show dhcp | sed -n 's/^dhcp\.\([^.=]*\)=dhcp$/\1/p'); do
+		[ "$(uci -q get dhcp."$section".ignore)" = "1" ] && continue
+		[ -n "$(uci -q get dhcp."$section".dhcpv4)" ] || uci set dhcp."$section".dhcpv4='server'
+		[ -n "$(uci -q get dhcp."$section".dhcpv6)" ] || uci set dhcp."$section".dhcpv6='server'
+	done
+	uci -q commit dhcp
+fi
+
+touch /etc/config/qol_config
+uci -q batch << EOI
+set qol_config.state='state'
+set qol_config.state.dhcp_default_migrated='1'
+commit qol_config
+EOI
+exit 0
